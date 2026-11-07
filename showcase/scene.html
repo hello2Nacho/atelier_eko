@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Atelier Eko showcase scene</title>
+<!--
+  Floating-browser showcase, rendered frame by frame by showcase/render.mjs (window mode).
+  window.render(t, src) draws time t (seconds) with live-capture frame `src` in the window.
+  Every property is a pure function of t, periodic over LOOP seconds, so the video loops cleanly.
+  Query: w, h (canvas px).
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500&family=JetBrains+Mono:wght@400&family=Manrope:wght@500&display=block" />
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #4f6b3a; }
+  #stage { position: relative; overflow: hidden; }
+  .bg { position: absolute; inset: 0; background: linear-gradient(120deg, #61804a 0%, #4f6b3a 45%, #3c5430 100%); }
+  .glow { position: absolute; inset: 0; background: radial-gradient(55% 50% at 42% 36%, rgba(255,244,222,.22), rgba(255,244,222,0)); }
+  svg.wave { position: absolute; inset: 0; width: 100%; height: 100%; }
+  canvas.grain { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: overlay; opacity: .045; pointer-events: none; }
+
+  .persp { position: absolute; inset: 0; perspective: 2200px; perspective-origin: 50% 35%; }
+  .win {
+    position: absolute; left: 50%; top: 50%; background: #fff; border-radius: 14px; overflow: hidden;
+    transform-origin: 50% 60%;
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, .06),
+      0 6px 12px rgba(30, 22, 12, .10),
+      0 24px 48px rgba(30, 22, 12, .16),
+      0 50px 90px rgba(46, 18, 6, .26),
+      0 90px 160px rgba(46, 18, 6, .22);   /* long, warm-tinted shadow lands on the coral */
+  }
+  .bar { position: relative; height: var(--bar); display: flex; align-items: center; padding: 0 calc(var(--bar) * .42); background: #f3f1ec; border-bottom: 1px solid #e4e0d8; }
+  .dots { display: flex; gap: calc(var(--bar) * .19); }
+  .dots i { width: calc(var(--bar) * .25); height: calc(var(--bar) * .25); border-radius: 50%; background: #d2d3d1; }
+  .url {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    height: calc(var(--bar) * .58); width: 34%; border-radius: 999px; background: #ebebea;
+    display: flex; align-items: center; justify-content: center; gap: calc(var(--bar) * .14);
+    font: 500 calc(var(--bar) * .3)/1 "Manrope", -apple-system, "Helvetica Neue", sans-serif; color: #5d6166; letter-spacing: .01em;
+  }
+  .url svg { width: calc(var(--bar) * .22); height: calc(var(--bar) * .22); }
+  .view { position: relative; aspect-ratio: 1440 / 900; overflow: hidden; background: #f7f5f1; }
+  .view img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* brand marks, quiet, in the corners */
+  .brand { position: absolute; z-index: 5; color: rgba(247,245,241,.86); pointer-events: none; }
+  .brand.wm { font: 500 calc(var(--u) * 15px)/1 "Fraunces", Georgia, serif; letter-spacing: .34em; font-variation-settings: "opsz" 24; }
+  .brand.tag { font: 400 calc(var(--u) * 11px)/1 "JetBrains Mono", monospace; letter-spacing: .16em; text-transform: uppercase; color: rgba(247,245,241,.62); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg"></div><div class="glow"></div>
+  <svg class="wave" preserveAspectRatio="none"><defs>
+    <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4643d"/><stop offset=".35" stop-color="#c4512e"/><stop offset="1" stop-color="#a6421f"/></linearGradient>
+  </defs><path id="wave2" fill="#dd8a64"/><path id="wave" fill="url(#cg)"/><path id="lip" fill="none" stroke="rgba(255,236,214,.24)" stroke-width="2"/></svg>
+  <div class="persp"><div class="win" id="win">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div>
+      <div class="url"><svg viewBox="0 0 12 14"><rect x="1" y="6" width="10" height="7.5" rx="1.6" fill="#8a8e93"/><path d="M3.3 6V4.4a2.7 2.7 0 0 1 5.4 0V6" stroke="#8a8e93" stroke-width="1.5" fill="none"/></svg>Atelier Eko · Try the Look</div>
+    </div>
+    <div class="view"><img id="shot" alt=""><img id="shot2" alt="" style="opacity:0"></div>
+  </div></div>
+  <div class="brand wm" id="wm">ATELIER EKO</div><div class="brand tag" id="tag">SS27 · Try the Look · Concept by HiNacho</div>
+  <canvas class="grain" id="grain"></canvas>
+</div>
+<script>
+  const P = new URLSearchParams(location.search);
+  const W = +(P.get("w") || 1080), H = +(P.get("h") || 1920);
+  const LOOP = +(P.get("loop") || 25);
+  const portrait = H > W;
+  const stage = document.getElementById("stage");
+  stage.style.width = W + "px"; stage.style.height = H + "px";
+  // brand corners scale with the canvas (designed at 1920 wide)
+  const U = W / 1920;
+  stage.style.setProperty("--u", U);
+  const wm = document.getElementById("wm"), tag = document.getElementById("tag");
+  wm.style.left = tag.style.right = 56 * U + "px";
+  wm.style.top = 50 * U + "px"; tag.style.top = 52 * U + "px";
+
+
+  // Window: 88% of width in portrait; in landscape, sized so it fits 80% of the height
+  const winW = portrait ? W * .88 : Math.min(W * .88, (H * .8) / (900 / 1440 + .035));
+  const bar = winW * .035;
+  const win = document.getElementById("win");
+  win.style.width = winW + "px";
+  win.style.setProperty("--bar", bar + "px");
+  const winH = bar + winW * 900 / 1440;
+
+  // Grain: a few pre-made noise tiles, cycled per frame
+  const gc = document.getElementById("grain");
+  gc.width = W; gc.height = H;
+  const gx = gc.getContext("2d");
+  const tiles = Array.from({ length: 1 }, () => {
+    const d = gx.createImageData(gc.width, gc.height);
+    for (let i = 0; i < d.data.length; i += 4) { const v = Math.random() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; }
+    return d;
+  });
+
+  const TAU = Math.PI * 2;
+  const easeOut = (x) => 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3);
+  const easeInOut = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+
+  // Terracotta wave rising from the bottom; edge drifts sideways and breathes (all periodic over LOOP)
+  function wavePath(t, layer = 0) {
+    const ph = TAU * t / LOOP + layer * 2.1;
+    const amp = H * (portrait ? .028 : .045) * (1 + .18 * Math.sin(ph * 2));
+    const base = (portrait ? .6 : .66) - layer * (portrait ? .045 : .07), slope = portrait ? .12 : .26;
+    const pts = [];
+    for (let i = 0; i <= 48; i++) {
+      const x = i / 48;
+      const y = H * (base + slope * .5 - slope * x) + amp * Math.sin(TAU * (x * .7) + ph) + amp * .35 * Math.sin(TAU * (x * 1.3) - ph * 2 + 1.3);
+      pts.push([x * W, y]);
+    }
+    const edge = "M" + pts.map((p) => p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" L");
+    return { fill: `${edge} L${W} ${H} L0 ${H} Z`, edge };
+  }
+
+  // `src2`/`mix` drive the return-to-top "rewind": the current frame slides down and fades out
+  // while the hero slides in from above (a literal 7,800px scroll in 1s strobes).
+  window.render = async (t, src, src2 = null, mix = 0) => {
+    // background
+    const w = wavePath(t);
+    document.getElementById("wave").setAttribute("d", w.fill);
+    document.getElementById("lip").setAttribute("d", w.edge);
+    document.getElementById("wave2").setAttribute("d", wavePath(t, 1).fill);
+    // Static grain: per-frame noise doubled the file size for no visible gain at this opacity
+    if (!gc.dataset.done) { gx.putImageData(tiles[0], 0, 0); gc.dataset.done = "1"; }
+
+    // window: intro (0–1s), mirrored outro over the last 0.6s, slow float, tilt that settles flat
+    const intro = easeOut(t / 1), outro = 1 - easeInOut((t - (LOOP - .6)) / .6) * (t > LOOP - .6 ? 1 : 0);
+    const vis = Math.min(intro, outro);
+    const scale = .92 + .08 * vis;
+    const float = 6 * Math.sin(TAU * t / (LOOP / 3));
+    const tilt = 3.5 * (1 - easeOut(t / 4)) + (t > LOOP - .6 ? 3.5 * (1 - outro) : 0);
+    win.style.opacity = vis.toFixed(4);
+    win.style.transform = `translate(-50%, calc(-50% + ${float.toFixed(2)}px)) rotateX(${tilt.toFixed(3)}deg) scale(${scale.toFixed(4)})`;
+
+    const img = document.getElementById("shot"), img2 = document.getElementById("shot2");
+    const load = async (el, s) => { if (s && el.getAttribute("src") !== s) { el.src = s; await el.decode().catch(() => {}); } };
+    await load(img, src);
+    if (src2) await load(img2, src2);
+    img.style.transform = `translateY(${(mix * 14).toFixed(2)}%)`;
+    img.style.filter = mix ? `blur(${(Math.sin(mix * Math.PI) * 3).toFixed(2)}px)` : "";
+    img2.style.opacity = src2 ? mix.toFixed(4) : "0";
+    img2.style.transform = `translateY(${(-(1 - mix) * 14).toFixed(2)}%)`;
+    img2.style.filter = src2 ? `blur(${(Math.sin(mix * Math.PI) * 3).toFixed(2)}px)` : "";
+  };
+  window.meta = { W, H, winW, winH, bar };
+  document.fonts.ready.then(() => (document.body.dataset.ready = "1"));
+</script>
+</body>
+</html>

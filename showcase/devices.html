@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Atelier Eko devices showcase</title>
+<!--
+  MacBook + iPhone scrolling the live site in sync, on the Atelier Eko moss/terracotta background.
+  Rendered frame by frame by showcase/render.mjs via window.render(t, frames, mix).
+  Every property is a pure function of t, periodic over LOOP, so the video loops cleanly.
+  Query: w, h, loop.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500&family=JetBrains+Mono:wght@400&family=Manrope:wght@500&display=block" />
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #4f6b3a; }
+  #stage { position: relative; overflow: hidden; }
+
+  /* ---------- Atelier Eko background (same as the browser-window showcase) ---------- */
+  .bg { position: absolute; inset: 0; background: linear-gradient(120deg, #61804a 0%, #4f6b3a 45%, #3c5430 100%); }
+  .glow { position: absolute; inset: 0; background: radial-gradient(55% 50% at 42% 36%, rgba(255,244,222,.22), rgba(255,244,222,0)); }
+  svg.wave { position: absolute; inset: 0; width: 100%; height: 100%; }
+  canvas.grain { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: overlay; opacity: .045; pointer-events: none; }
+
+  /* ---------- MacBook Pro ---------- */
+  .mac { position: absolute; width: var(--lw); }
+  .mac .lid {
+    position: relative; width: 100%;
+    padding: calc(var(--lw) * .036) calc(var(--lw) * .017) calc(var(--lw) * .026);
+    background: #0b0c0d;
+    border-radius: calc(var(--lw) * .032) calc(var(--lw) * .032) calc(var(--lw) * .012) calc(var(--lw) * .012);
+    box-shadow: 0 0 0 calc(var(--lw) * .0028) #b9bcc0, 0 0 0 calc(var(--lw) * .0042) #8d9196, inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .mac .notch { position: absolute; left: 50%; top: 0; transform: translateX(-50%); width: calc(var(--lw) * .1); height: calc(var(--lw) * .02); background: #000; border-radius: 0 0 calc(var(--lw) * .008) calc(var(--lw) * .008); }
+  .mac .notch::after { content: ""; position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); width: calc(var(--lw) * .0055); height: calc(var(--lw) * .0055); border-radius: 50%; background: radial-gradient(circle at 35% 35%, #2f3c52, #0d1118 60%); }
+  .mac .screen { position: relative; aspect-ratio: 16 / 10; overflow: hidden; border-radius: calc(var(--lw) * .004); background: #fff; }
+  .mac .hinge { width: 92%; margin: 0 auto; height: calc(var(--lw) * .009); background: linear-gradient(#2b2d30, #55595e 45%, #1c1e20); border-radius: 0 0 calc(var(--lw) * .006) calc(var(--lw) * .006); }
+  .mac .base {
+    position: relative; width: 114%; margin-left: -7%; height: calc(var(--lw) * .026);
+    background: linear-gradient(180deg, #f2f3f4 0%, #d5d8db 22%, #b9bdc1 60%, #8f9398 100%);
+    border-radius: calc(var(--lw) * .004) calc(var(--lw) * .004) calc(var(--lw) * .03) calc(var(--lw) * .03) / calc(var(--lw) * .004) calc(var(--lw) * .004) calc(var(--lw) * .016) calc(var(--lw) * .016);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -3px 4px rgba(0,0,0,.28), 0 2px 0 #6e7277;
+  }
+  .mac .base::before { content: ""; position: absolute; left: 50%; top: 0; transform: translateX(-50%); width: 13%; height: 38%; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: linear-gradient(#9aa0a6, #c9cdd1); }
+
+  /* ---------- iPhone 15 Pro ---------- */
+  .phone { position: absolute; width: var(--pw); aspect-ratio: 390 / 844; }
+  .phone .frame { position: absolute; inset: 0; border-radius: calc(var(--pw) * .16); background: linear-gradient(135deg, #e3e0da 0%, #a9a59e 18%, #d8d4cd 38%, #8a867f 62%, #c9c5be 82%, #7b7771 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55), inset 0 0 0 2px rgba(0,0,0,.18); }
+  .phone .glass { position: absolute; inset: calc(var(--pw) * .022); border-radius: calc(var(--pw) * .142); background: #050505; padding: calc(var(--pw) * .032); }
+  .phone .screen { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: calc(var(--pw) * .112); background: #fff; }
+  .phone .island { position: absolute; left: 50%; top: calc(var(--pw) * .074); transform: translateX(-50%); z-index: 4; width: calc(var(--pw) * .3); height: calc(var(--pw) * .088); border-radius: 999px; background: #000; }
+  .phone .btn { position: absolute; width: calc(var(--pw) * .016); border-radius: 3px; background: linear-gradient(90deg, #77736d, #d6d2cb 50%, #8a867f); }
+  .phone .btn.l { left: calc(var(--pw) * -.012); } .phone .btn.r { right: calc(var(--pw) * -.012); }
+  .phone .status { position: absolute; left: 0; right: 0; top: 0; height: 6.4%; z-index: 3; background: #f7f5f1; display: flex; align-items: center; justify-content: space-between; padding: 0 9% 0 11%; font: 600 calc(var(--pw) * .044)/1 -apple-system, "Helvetica Neue", sans-serif; color: #0d0e0e; }
+  .phone .status svg { height: calc(var(--pw) * .032); width: auto; display: block; }
+  .phone .status .icons { display: flex; gap: calc(var(--pw) * .014); align-items: center; }
+  .phone .view { position: absolute; left: 0; right: 0; top: 6.4%; bottom: 0; overflow: hidden; }
+
+  /* shared: two stacked frames per screen (second one is only used for the return-to-top rewind) */
+  .view img, .mac .screen img { position: absolute; left: 0; top: 0; width: 100%; height: auto; display: block; }
+  .mac .screen img { height: 100%; }
+  .reflect { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(118deg, rgba(255,255,255,.12) 0%, rgba(255,255,255,.04) 34%, rgba(255,255,255,0) 34.2%); }
+  .shadow { position: absolute; border-radius: 50%; pointer-events: none; }
+
+  /* brand marks, quiet, in the corners */
+  .brand { position: absolute; z-index: 5; color: rgba(247,245,241,.86); pointer-events: none; }
+  .brand.wm { font: 500 calc(var(--u) * 15px)/1 "Fraunces", Georgia, serif; letter-spacing: .34em; font-variation-settings: "opsz" 24; }
+  .brand.tag { font: 400 calc(var(--u) * 11px)/1 "JetBrains Mono", monospace; letter-spacing: .16em; text-transform: uppercase; color: rgba(247,245,241,.62); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg"></div><div class="glow"></div>
+  <svg class="wave" preserveAspectRatio="none"><defs>
+    <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4643d"/><stop offset=".35" stop-color="#c4512e"/><stop offset="1" stop-color="#a6421f"/></linearGradient>
+  </defs><path id="wave2" fill="#dd8a64"/><path id="wave" fill="url(#cg)"/><path id="lip" fill="none" stroke="rgba(255,236,214,.24)" stroke-width="2"/></svg>
+  <div id="devices"></div>
+  <div class="brand wm" id="wm">ATELIER EKO</div><div class="brand tag" id="tag">SS27 · Try the Look · Concept by HiNacho</div>
+  <canvas class="grain" id="grain"></canvas>
+</div>
+<script>
+  const P = new URLSearchParams(location.search);
+  const W = +(P.get("w") || 1920), H = +(P.get("h") || 1080);
+  const LOOP = +(P.get("loop") || 25);
+  const TAU = Math.PI * 2;
+  const stage = document.getElementById("stage");
+  stage.style.width = W + "px"; stage.style.height = H + "px";
+  // brand corners scale with the canvas (designed at 1920 wide)
+  const U = W / 1920;
+  stage.style.setProperty("--u", U);
+  const wm = document.getElementById("wm"), tag = document.getElementById("tag");
+  wm.style.left = tag.style.right = 56 * U + "px";
+  wm.style.top = 50 * U + "px"; tag.style.top = 52 * U + "px";
+
+  const el = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; };
+
+  // ---------- layout (proportions from the reference mockup) ----------
+  const lw = W * .615, lh = lw * .703;
+  const lx = W * .48 - lw / 2, ly = H * .1;
+  const ph = lh * .53, pw = ph * 390 / 844;
+  const px = W * .796 - pw / 2, py = H * .93 - ph;
+
+  const dev = document.getElementById("devices");
+  // ground shadows (static; the devices float a few px above them)
+  const ground = (cx, cy, w, dark, contact, who) => {
+    dev.append(el(`<div class="shadow ${who}" style="left:${cx - w * .55}px;top:${cy - w * .045}px;width:${w * 1.1}px;height:${w * .11}px;background:radial-gradient(closest-side, rgba(46,18,6,${dark}), rgba(46,18,6,0));filter:blur(${w * .025}px)"></div>`));
+    dev.append(el(`<div class="shadow ${who}" style="left:${cx - w * .48}px;top:${cy - w * .008}px;width:${w * .96}px;height:${w * .02}px;background:radial-gradient(closest-side, rgba(0,0,0,${contact}), rgba(0,0,0,0));filter:blur(${w * .004}px)"></div>`));
+  };
+  ground(lx + lw / 2, ly + lh, lw * 1.14, .34, .45, "sh-mac");
+  const mac = el(`<div class="mac" style="--lw:${lw}px;left:${lx}px;top:${ly}px;filter:drop-shadow(0 30px 40px rgba(30,22,12,.22))">
+    <div class="lid"><div class="notch"></div><div class="screen"><img id="m1" alt=""><img id="m2" alt="" style="opacity:0"><div class="reflect"></div></div></div>
+    <div class="hinge"></div><div class="base"></div></div>`);
+  dev.append(mac);
+  ground(px + pw / 2, py + ph, pw * 1.1, .4, .6, "sh-phone");
+  const btn = (side, top, len) => `<i class="btn ${side}" style="top:${top * ph}px;height:${len * ph}px"></i>`;
+  const phone = el(`<div class="phone" style="--pw:${pw}px;left:${px}px;top:${py}px;filter:drop-shadow(-10px 24px 26px rgba(30,22,12,.3)) drop-shadow(0 4px 6px rgba(0,0,0,.25))">
+    ${btn("l", .17, .035)}${btn("l", .235, .065)}${btn("l", .315, .065)}${btn("r", .25, .1)}
+    <div class="frame"></div>
+    <div class="glass"><div class="screen">
+      <div class="status"><span>9:41</span><span class="icons">
+        <svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg viewBox="0 0 16 12"><path d="M8 11.5 5.6 9a3.4 3.4 0 0 1 4.8 0zM3.4 6.8a6.5 6.5 0 0 1 9.2 0l-1.4 1.4a4.5 4.5 0 0 0-6.4 0zM1.1 4.5a9.8 9.8 0 0 1 13.8 0l-1.4 1.4a7.8 7.8 0 0 0-11 0z" fill="currentColor"/></svg>
+        <svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="19" height="8" rx="1.8" fill="currentColor"/><rect x="24" y="4" width="1.6" height="4" rx=".8" fill="currentColor" opacity=".45"/></svg>
+      </span></div>
+      <div class="view"><img id="p1" alt=""><img id="p2" alt="" style="opacity:0"></div>
+      <div class="reflect"></div>
+    </div></div>
+    <div class="island"></div></div>`);
+  dev.append(phone);
+
+  // ---------- grain (static texture: per-frame noise doubles file size for no visible gain) ----------
+  const gc = document.getElementById("grain");
+  gc.width = W; gc.height = H;
+  const gx = gc.getContext("2d"), noise = gx.createImageData(gc.width, gc.height);
+  for (let i = 0; i < noise.data.length; i += 4) { const v = Math.random() * 255; noise.data[i] = noise.data[i + 1] = noise.data[i + 2] = v; noise.data[i + 3] = 255; }
+  gx.putImageData(noise, 0, 0);
+
+  // ---------- terracotta wave: rises from the bottom, drifts and breathes (periodic over LOOP) ----------
+  function wavePath(t, layer = 0) {
+    const ph = TAU * t / LOOP + layer * 2.1;
+    const amp = H * .045 * (1 + .18 * Math.sin(ph * 2));
+    const base = .66 - layer * .07, slope = .26;
+    let d = "";
+    for (let i = 0; i <= 48; i++) {
+      const x = i / 48;
+      const y = H * (base + slope * .5 - slope * x) + amp * Math.sin(TAU * (x * .7) + ph) + amp * .35 * Math.sin(TAU * (x * 1.3) - ph * 2 + 1.3);
+      d += (i ? " L" : "M") + (x * W).toFixed(1) + " " + y.toFixed(1);
+    }
+    return { edge: d, fill: `${d} L${W} ${H} L0 ${H} Z` };
+  }
+
+  const easeOut = (x) => 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3);
+  const easeInOut = (x) => { x = Math.min(Math.max(x, 0), 1); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+  const load = async (img, src) => { if (src && img.getAttribute("src") !== src) { img.src = src; await img.decode().catch(() => {}); } };
+  // Two frames per screen: during the rewind, the current one slides down and fades while the hero slides in
+  const setScreen = async (a, b, srcA, srcB, mix) => {
+    await load(a, srcA);
+    if (srcB) await load(b, srcB);
+    const blur = srcB ? `blur(${(Math.sin(mix * Math.PI) * 2.5).toFixed(2)}px)` : "";
+    a.style.transform = `translateY(${(mix * 12).toFixed(2)}%)`; a.style.filter = blur;
+    b.style.opacity = srcB ? mix.toFixed(4) : "0";
+    b.style.transform = `translateY(${(-(1 - mix) * 12).toFixed(2)}%)`; b.style.filter = blur;
+  };
+
+  window.render = async (t, f, mix = 0) => {
+    const w = wavePath(t);
+    document.getElementById("wave").setAttribute("d", w.fill);
+    document.getElementById("lip").setAttribute("d", w.edge);
+    document.getElementById("wave2").setAttribute("d", wavePath(t, 1).fill);
+
+    // devices: rise + fade in over 0–1s (phone trails slightly), mirrored outro over the last 0.6s, slow independent float
+    const outro = t > LOOP - .6 ? 1 - easeInOut((t - (LOOP - .6)) / .6) : 1;
+    const inMac = Math.min(easeOut(t / 1), outro), inPhone = Math.min(easeOut((t - .15) / 1), outro);
+    const fMac = 4 * Math.sin(TAU * t / (LOOP / 3)), fPhone = 7 * Math.sin(TAU * t / (LOOP / 4) + 1.2);
+    mac.style.opacity = inMac.toFixed(4);
+    mac.style.transform = `translateY(${((1 - inMac) * 40 + fMac).toFixed(2)}px)`;
+    phone.style.opacity = inPhone.toFixed(4);
+    // ground shadows fade with their device, so the loop's empty frames show only the background
+    document.querySelectorAll(".sh-mac").forEach((s) => (s.style.opacity = inMac.toFixed(4)));
+    document.querySelectorAll(".sh-phone").forEach((s) => (s.style.opacity = inPhone.toFixed(4)));
+    phone.style.transform = `translateY(${((1 - inPhone) * 60 + fPhone).toFixed(2)}px)`;
+
+    await setScreen(document.getElementById("m1"), document.getElementById("m2"), f.m1, f.m2, mix);
+    await setScreen(document.getElementById("p1"), document.getElementById("p2"), f.p1, f.p2, mix);
+  };
+  document.fonts.ready.then(() => (document.body.dataset.ready = "1"));
+</script>
+</body>
+</html>
